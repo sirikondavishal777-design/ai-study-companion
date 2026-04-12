@@ -1,3 +1,4 @@
+gtts
 streamlit
-PyPDF2
 requests
+PyPDF2
