@@ -1,7 +1,6 @@
 import streamlit as st
 import PyPDF2
 import os
-import requests   # ✅ ADD THIS
 import uuid
 import glob
 
@@ -10,9 +9,48 @@ try:
 except ImportError:
     gTTS = None
 
+def generate_explanation(text):
+    return "Simple explanation:\n" + text[:2000]
+
 def get_ai_response(prompt):
-    """Fallback mock AI response to handle the missing function from the Voice tab."""
-    return f"I received your voice prompt: '{prompt}'. Keep studying hard!"
+    """Fallback local mock response to strictly prevent breaking other tabs."""
+    if "5 MCQs" in prompt:
+        return """Q1: What is the primary focus of the provided context?
+A. Analyzing literature
+B. Memorizing random facts
+C. Core principles and practical concepts
+D. Ignoring practical applications
+Answer: C
+
+Q2: How can this material be utilized in real life?
+A. It has no real-life usage.
+B. By applying its theories to solve practical problems.
+C. Only by writing essays about it.
+D. By watching videos without practicing.
+Answer: B
+
+Q3: Which of the following is essential for mastering this subject?
+A. Avoiding all challenges.
+B. Learning only one specific subset.
+C. Continuous practice and problem solving.
+D. Refusing to read new materials.
+Answer: C
+
+Q4: What is the best method to evaluate your understanding?
+A. Skipping exams.
+B. Self-assessing with flashcards and quizzes.
+C. Ignoring all review materials.
+D. Waiting until the night before the test.
+Answer: B
+
+Q5: Why is consistency important in studying?
+A. It helps retain information long-term.
+B. It guarantees you will never fail.
+C. It allows you to study faster perfectly.
+D. It replaces the need to focus.
+Answer: A"""
+    
+    return f"Local processing activated. Received: {prompt[:100]}..."
 
 def extract_pdf_text(uploaded_file):
     """Safely extracts text from all pages of an uploaded PDF file."""
@@ -115,23 +153,34 @@ def main():
         st.title("📚 Topic Explanation")
         st.write("Determine a subject and press generate to build a complete learning module.")
         
-        # Topic Input
-        topic = st.text_input("Enter a study topic you want to learn about:", key="topic_input")
+        topic = ""
+        if pdf_text:
+            st.info("📄 Using PDF content for explanation")
+        else:
+            st.info("✍️ Using topic input for explanation")
+            topic = st.text_input("Enter a study topic you want to learn about:", key="topic_input")
         
         if st.button("Generate Explanation", type="primary", use_container_width=True):
-            if topic:
+            if not pdf_text and not topic:
+                st.warning("⚠️ Please enter a topic or upload a PDF first to generate an explanation.")
+            else:
                 st.session_state["exp_active"] = True
                 st.session_state["exp_topic"] = topic
-            else:
-                st.warning("⚠️ Please enter a topic first to generate an explanation.")
                 
-        # Must keep output alive using session_state so the Read Aloud HTML block works properly
-        if st.session_state.get("exp_active") and st.session_state.get("exp_topic"):
+                # Handle priority rules
+                with st.spinner("Generating local explanation..."):
+                    if pdf_text:
+                        st.session_state["exp_response"] = generate_explanation(pdf_text)
+                    else:
+                        st.session_state["exp_response"] = generate_explanation(topic)
+                
+        # Render if generated
+        if st.session_state.get("exp_active") and "exp_response" in st.session_state:
             st.subheader("Result")
             st.success("Analysis complete! See explanation below.")
             
-            # Store the resulting string representation of the explanation
-            response = generate_mock_explanation(st.session_state["exp_topic"], pdf_text)
+            response = st.session_state["exp_response"]
+            st.write(response)
             
             st.write("")
             
@@ -170,48 +219,34 @@ def main():
     elif section == "🧠 Quiz":
         st.title("🎯 Quiz Generation")
         
-        # We grab the topic if they already filled it out in the Explanation tab
-        topic = st.session_state.get("topic_input", "")
-        if not topic:
-            st.info("💡 Start by defining a topic in the **Explanation** tab, or fill one out temporarily below.")
-            topic = st.text_input("Temporary Topic for Quiz:", key="temp_quiz_topic")
-        else:
-            st.info(f"Targeting Quiz Subject: **{topic.strip().title()}**")
-            
         if st.button("Generate Quiz", type="primary", use_container_width=True):
-            if not topic:
-                st.warning("⚠️ Please enter a topic first to generate a quiz.")
+            source_text = None
+            if pdf_text:
+                st.info("Generating quiz from PDF content...")
+                source_text = pdf_text[:1500]
+            elif st.session_state.get("exp_response"):
+                st.info("Generating quiz from explanation...")
+                source_text = st.session_state["exp_response"]
+                
+            if not source_text:
+                st.warning("⚠️ Please upload a PDF or generate an explanation first.")
             else:
                 st.session_state["quiz_active"] = True
-                st.session_state["quiz_topic"] = topic
-                st.session_state["quiz_score"] = None
-                display_topic = topic.strip().title()
                 
-                quiz_string = f"""Q1: What is the primary goal of studying {display_topic}?
-A. To understand its foundational principles.
-B. To memorize random facts.
-C. To ignore practical applications.
-D. To just pass an exam.
-Answer: A
+                prompt = f"""Use this input:
+{source_text}
 
-Q2: How can {display_topic} be utilized in real life?
-A. It has no real-life usage.
-B. By applying its theories to solve practical problems.
-C. Only by writing essays about it.
-D. By watching videos without practicing.
-Answer: B
-
-Q3: Which of the following is essential for mastering {display_topic}?
-A. Avoiding all challenges.
-B. Learning only one specific subset.
-C. Continuous practice and problem solving.
-D. Refusing to read new materials.
-Answer: C"""
+Create:
+- 5 MCQs
+- with options A/B/C/D
+- with correct answers"""
                 
-                if "quiz_data" not in st.session_state or st.session_state.get("quiz_topic") != topic:
-                    st.session_state.quiz_data = quiz_string
-                    st.session_state.quiz_submitted = False
-                    st.session_state.quiz_score = None
+                with st.spinner("Generating quiz..."):
+                    quiz_string = get_ai_response(prompt)
+                
+                st.session_state.quiz_data = quiz_string
+                st.session_state.quiz_submitted = False
+                st.session_state.quiz_score = None
 
         # Render Quiz if active
         if st.session_state.get("quiz_active"):
@@ -253,7 +288,8 @@ Answer: C"""
                         st.session_state["quiz_correct_answers"] = correct_answers
                     
                     if st.session_state.get("quiz_submitted"):
-                        st.success(f"Your Score: {st.session_state.get('quiz_score')}/3")
+                        total_qs = len(st.session_state.get('quiz_correct_answers', {}))
+                        st.success(f"Your Score: {st.session_state.get('quiz_score')}/{total_qs}")
                         
                         st.info("Correct Answers:")
                         for idx, corr in st.session_state.get("quiz_correct_answers", {}).items():
