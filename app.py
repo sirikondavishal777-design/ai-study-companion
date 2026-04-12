@@ -2,25 +2,13 @@ import streamlit as st
 import PyPDF2
 import os
 import requests   # ✅ ADD THIS
+import uuid
+import glob
 
 try:
-    import pyttsx3
+    from gtts import gTTS
 except ImportError:
-    pyttsx3 = None
-
-API_KEY = "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"
-
-def speak_text(text):
-    """Speaks the input text aloud securely using pyttsx3 engine."""
-    if pyttsx3 is None:
-        st.error("TTS engine missing! Please install it via terminal: pip install pyttsx3")
-        return
-    try:
-        engine = pyttsx3.init()
-        engine.say(text)
-        engine.runAndWait()
-    except Exception as e:
-        st.error(f"Voice playback failed: {e}")
+    gTTS = None
 
 def get_ai_response(prompt):
     """Fallback mock AI response to handle the missing function from the Voice tab."""
@@ -137,7 +125,7 @@ def main():
             else:
                 st.warning("⚠️ Please enter a topic first to generate an explanation.")
                 
-        # Must keep output alive using session_state so the Read Aloud button works properly
+        # Must keep output alive using session_state so the Read Aloud HTML block works properly
         if st.session_state.get("exp_active") and st.session_state.get("exp_topic"):
             st.subheader("Result")
             st.success("Analysis complete! See explanation below.")
@@ -145,10 +133,33 @@ def main():
             # Store the resulting string representation of the explanation
             response = generate_mock_explanation(st.session_state["exp_topic"], pdf_text)
             
-            # Read Aloud Target
             st.write("")
-            if st.button("🔊 Read Aloud"):
-                speak_text(response)
+            
+            st.write("")
+            
+            if st.button("🔊 Read Aloud", use_container_width=True):
+                if not response.strip():
+                    st.warning("⚠️ Text is empty. Nothing to read aloud.")
+                elif gTTS is None:
+                    st.error("Missing gTTS library! Please use: pip install gTTS")
+                else:
+                    with st.spinner("Generating audio snippet..."):
+                        try:
+                            # Clean up previously generated audio files across reruns
+                            for old_file in glob.glob("audio_*.mp3"):
+                                try:
+                                    os.remove(old_file)
+                                except Exception:
+                                    pass
+                                    
+                            # Create new UUID tracked audio payload
+                            file_name = f"audio_{uuid.uuid4().hex}.mp3"
+                            tts = gTTS(text=response, lang='en')
+                            tts.save(file_name)
+                            
+                            st.audio(file_name, format="audio/mp3", autoplay=True)
+                        except Exception as e:
+                            st.error(f"TTS Engine Error: {e}")
                 
             if pdf_text:
                 st.divider()
