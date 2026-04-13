@@ -86,6 +86,41 @@ Consider a scenario where you have to organize a massive logistics system or fig
 
 ### 📌 Simple summary
 In short, learning about {display_topic} effectively bridges the gap between abstract theory and practical, everyday utility. By mastering its mechanics, you unlock a versatile and powerful toolkit for problem-solving, critical thinking, and impactful innovation that extends far beyond the boundaries of the classroom."""
+    if "You are a helpful, friendly tutor and study companion" in prompt:
+        try:
+            import urllib.request
+            import json
+            
+            headers = {"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"}
+            url = "https://text.pollinations.ai/openai"
+            data = json.dumps({
+                "messages": [{"role": "user", "content": prompt}],
+                "model": "openai"
+            }).encode('utf-8')
+            
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=20) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result["choices"][0]["message"]["content"]
+        except Exception:
+            pass # Fallback to local simulated AI when entirely without network connection
+            
+        user_msg = prompt.split("User:")[-1].strip()
+        
+        import re
+        clean_msg = re.sub(r'[^\w\s]', '', user_msg.lower()).strip()
+        
+        if clean_msg in ["hi", "hello", "hey", "hlo", "greetings", "hi there"]:
+            return "Hi! How can I help you?"
+            
+        if "study" in clean_msg or "advice" in clean_msg or "how to" in clean_msg or "what should i do" in clean_msg:
+            return """Start with a simple plan:
+- Focus on one topic at a time
+- Take short notes while studying
+- Revise daily
+- Practice questions regularly"""
+
+        return "The core concept relies on clear structural principles that interact logically to produce the final outcome. Focus firmly on practical applications and foundational rules to master it completely. What specific detail would you like me to elaborate on?"
 
     return f"Local processing activated. Received: {prompt[:100]}..."
 
@@ -148,13 +183,13 @@ def generate_mock_explanation(topic, pdf_content=None):
 
 def main():
     # Set page configuration for a centered, clean layout
-    st.set_page_config(page_title="AI Student Study Companion", page_icon="🎓", layout="centered")
+    st.set_page_config(page_title="Student Study Companion", page_icon="🎓", layout="centered")
 
     # --- SIDEBAR NAVIGATION ---
-    st.sidebar.title("AI Study Companion")
+    st.sidebar.title("Student Study Companion")
     section = st.sidebar.radio(
         "Navigation",
-        ["🏠 Home", "📘 Explanation", "🧠 Quiz", "💬 Chat", "📝 Notes", "🎤 Voice"]
+        ["🏠 Home", "📘 Explanation", "🧠 Quiz", "💬 Chat", "📝 Notes"]
     )
     
     st.sidebar.divider()
@@ -173,7 +208,7 @@ def main():
 
     # --- HOME SECTION ---
     if section == "🏠 Home":
-        st.title("📚 AI Study Companion")
+        st.title("📚 Student Study Companion")
         st.write("Learn smarter with AI-powered explanations, quizzes, and notes.")
         
         st.divider()
@@ -360,15 +395,29 @@ Create:
             else:
                 st.session_state["chat_history"].append({"role": "User", "content": user_question})
 
-                ans = "That's a great question! Keep exploring to understand the fundamentals better."
-                topic_lower = topic.strip().lower() if topic else ""
-                question_lower = user_question.lower()
+                context = ""
+                if topic:
+                    context += f"Optional Study Topic: {topic}\n\n"
+                if pdf_text:
+                    context += f"Optional Document Reference:\n{pdf_text[:1000]}\n\n"
+                
+                prompt = f"""You are a helpful, friendly tutor and study companion. 
+You can talk about any topic, help with studies, explain concepts, solve problems, and have normal conversation with the user. 
+Respond naturally, simply, and directly as a human-like tutor.
 
-                if topic_lower and topic_lower in question_lower:
-                    ans = f"Since you asked about '{topic.strip()}', it is essential to focus on practical applications as well as theory to master it."
-                elif pdf_text:
-                    ans = f"Based on the uploaded PDF document, here is a relevant insight: '{pdf_text[:80]}...'"
+STRICT RULES:
+- DO NOT introduce yourself.
+- DO NOT mention you are an AI or ChatGPT.
+- DO NOT repeat the user's question.
+- DO NOT say "You mentioned" or "You asked" or summarize the input.
+- NO motivational filler sentences.
+- NO redirecting to other parts of the app.
+- ALWAYS answer the question directly with clear information.
 
+{context}User: {user_question}"""
+
+                ans = get_ai_response(prompt)
+                
                 st.session_state["chat_history"].append({"role": "AI", "content": ans})
                 st.rerun()
 
@@ -434,34 +483,7 @@ Create:
                 st.subheader("Result")
                 st.write(quiz_output)
 
-    # --- VOICE SECTION ---
-    elif section == "🎤 Voice":
-        st.subheader("🎤 Voice Assistant")
-        st.write("Click the button and speak your question")
 
-        if st.button("Start Recording", type="primary"):
-            # Execute within a try-except heavily gracefully as standard
-            try:
-                import speech_recognition as sr
-                recognizer = sr.Recognizer()
-                with sr.Microphone() as source:
-                    st.write("Listening... (Speak into your microphone now)")
-                    audio = recognizer.listen(source, timeout=10)
-                
-                try:
-                    text = recognizer.recognize_google(audio)
-                    st.write("You said:", text)
-
-                    # Send to AI
-                    response = get_ai_response(text)
-                    st.subheader("AI Response")
-                    st.write(response)
-
-                except Exception:
-                    st.error("Could not understand audio. Please ensure your microphone is working and speak clearly.")
-            except ImportError as exc:
-                st.error(f"Cannot access microphone because required functionality is missing: {exc}.")
-                st.warning("To use the Voice Feature locally, Python requires external tools. Please install 'SpeechRecognition' and 'PyAudio'.")
 
 if __name__ == "__main__":
     main()
