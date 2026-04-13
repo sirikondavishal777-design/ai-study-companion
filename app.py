@@ -9,8 +9,17 @@ try:
 except ImportError:
     gTTS = None
 
-def generate_explanation(text):
-    return "Simple explanation:\n" + text[:2000]
+def generate_explanation(topic):
+    prompt = f"""Explain the topic in simple language for students. 
+Include:
+- Definition
+- How it works
+- Types (if any)
+- Real-life examples
+- Simple summary
+
+Topic: {topic}"""
+    return get_ai_response(prompt)
 
 def get_ai_response(prompt):
     """Fallback local mock response to strictly prevent breaking other tabs."""
@@ -50,6 +59,34 @@ C. It allows you to study faster perfectly.
 D. It replaces the need to focus.
 Answer: A"""
     
+    if "Explain the topic" in prompt:
+        topic_part = prompt.split("Topic:")[-1].strip()
+        
+        # If it's a huge PDF text
+        if len(topic_part) > 100:
+            display_topic = "the concepts covered in your document"
+        else:
+            display_topic = topic_part.title()
+            
+        return f"""Here is a detailed explanation for **{display_topic}**:
+
+### 📖 Definition
+**{display_topic}** refers to a comprehensive area of study that focuses on understanding specific structures, behaviors, systems, and underlying principles. It provides the essential building blocks needed to intuitively grasp more complex ideas in this domain.
+
+### ⚙️ How it works
+At a fundamental level, it operates by taking basic inputs or concepts and logically processing them through established rules to produce a meaningful outcome. Whether functioning in nature, business, technology, or theoretical frameworks, it relies on a steady flow of logical interactions and sequential steps to maintain order and efficiency naturally.
+
+### 🗂️ Types (if any)
+Generally, you can categorize this subject into two main branches:
+1. **Theoretical/Foundational:** Researching the core mathematical, scientific, or conceptual principles, fundamentally answering the "why" and "what."
+2. **Applied/Practical:** Utilizing those principles to directly solve real-world problems, essentially answering the "how."
+
+### 🌍 Real-life examples
+Consider a scenario where you have to organize a massive logistics system or figure out how dynamic variables affect a complex outcome. The core principles of {display_topic} act as your master blueprint. Just as an experienced architect uses physics and geometry to ensure a towering building doesn't collapse, deeply understanding this topic provides you with the foundational rules required to build, thoroughly analyze, or interpret intricate scenarios in your daily life.
+
+### 📌 Simple summary
+In short, learning about {display_topic} effectively bridges the gap between abstract theory and practical, everyday utility. By mastering its mechanics, you unlock a versatile and powerful toolkit for problem-solving, critical thinking, and impactful innovation that extends far beyond the boundaries of the classroom."""
+
     return f"Local processing activated. Received: {prompt[:100]}..."
 
 def extract_pdf_text(uploaded_file):
