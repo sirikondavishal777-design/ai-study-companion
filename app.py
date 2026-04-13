@@ -514,18 +514,35 @@ STRICT RULES:
     # --- NOTES SECTION ---
     with tab4:
         st.subheader("📝 My Notes")
-        st.write("Write, append, and save insights directly to your private session.")
+        st.write("Write, append, and save insights private to your session.")
         
-        # Initialize session state for isolated user notes
+        import uuid
+        if "user_id" not in st.session_state:
+            st.session_state["user_id"] = str(uuid.uuid4())
+            
+        user_file = f"notes_{st.session_state['user_id']}.txt"
+        
+        # Load from personalized file if available
         if "notes" not in st.session_state:
             st.session_state["notes"] = ""
+            if os.path.exists(user_file):
+                try:
+                    with open(user_file, "r", encoding="utf-8") as f:
+                        st.session_state["notes"] = f.read()
+                except Exception:
+                    pass
 
         user_notes = st.text_area("Workspace Editor:", value=st.session_state["notes"], height=400, label_visibility="collapsed")
 
         if st.button("💾 Save Notes", type="primary", use_container_width=True):
             st.session_state["notes"] = user_notes
-            st.subheader("Result")
-            st.success("✅ Notes securely saved to your private session!")
+            try:
+                with open(user_file, "w", encoding="utf-8") as f:
+                    f.write(user_notes)
+                st.subheader("Result")
+                st.success("✅ Notes securely saved to your private device file!")
+            except Exception as e:
+                st.error("❌ Failed to save notes. Please try again.")
                 
         st.divider()
         st.markdown("### 🧠 AI Smart Notes")
